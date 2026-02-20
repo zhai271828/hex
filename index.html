@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>联机抽奖系统 - Modular SDK</title>
+  <!-- Firebase Modular SDK CDN (v10.x 最新稳定版) -->
+  <script type="module">
+    // 所有代码放这里，因为 type="module" 支持 import
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue, remove, push, get } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+    // import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-analytics.js";  // 可选，如果你需要分析
+
+    // 你的配置（直接复制你贴的）
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmqq64kRIAzTKdnveJqg25XTV19QMmQ1s",
+      authDomain: "choujiang-88289.firebaseapp.com",
+      databaseURL: "https://choujiang-88289-default-rtdb.firebaseio.com",
+      projectId: "choujiang-88289",
+      storageBucket: "choujiang-88289.firebasestorage.app",
+      messagingSenderId: "423937514409",
+      appId: "1:423937514409:web:c674a44070bfab9e5482b8",
+      measurementId: "G-27T9NNLNL6"
+    };
+
+    // 初始化
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    // const analytics = getAnalytics(app);  // 可选
+
+    let roomId = "default-room";
+    let myName = "";
+    let isHost = false;
+
+    // 加入抽奖
+    window.join = function() {
+      roomId = document.getElementById("roomId").value.trim() || "default-room";
+      myName = document.getElementById("myName").value.trim();
+      if (!myName) {
+        alert("请输入名字！");
+        return;
+      }
+
+      // 写入玩家数据（用 set 覆盖同名，避免重复）
+      set(ref(db, `rooms/${roomId}/players/${myName}`), {
+        name: myName,
+        joinedAt: Date.now()
+      });
+
+      // 监听玩家列表变化
+      onValue(ref(db, `rooms/${roomId}/players`), (snapshot) => {
+        const list = document.getElementById("participants");
+        list.innerHTML = "";
+        const players = snapshot.val() || {};
+        Object.values(players).forEach(p => {
+          const li = document.createElement("li");
+          li.textContent = p.name;
+          list.appendChild(li);
+        });
+
+        // 简单房主逻辑：第一个加入的人是房主
+        const playerKeys = Object.keys(players);
+        if (playerKeys.length === 1 && playerKeys[0] === myName) {
+          isHost = true;
+          document.getElementById("startBtn").style.display = "inline-block";
+        }
+      });
+
+      // 监听中奖者
+      onValue(ref(db, `rooms/${roomId}/winner`), (snapshot) => {
+        const winner = snapshot.val();
+        if (winner) {
+          document.getElementById("winner").textContent = `🎉 大奖得主：${winner} 🎉`;
+          document.getElementById("status").textContent = "抽奖结束！";
+        }
+      });
+
+      document.getElementById("status").textContent = "已加入！等待开始...";
+    };
+
+    // 开始抽奖（房主专用）
+    window.startDraw = function() {
+      if (!isHost) {
+        alert("只有房主能开始抽奖哦~");
+        return;
+      }
+
+      get(ref(db, `rooms/${roomId}/players`)).then((snapshot) => {
+        const players = snapshot.val() || {};
+        const names = Object.keys(players);
+        if (names.length < 1) {
+          alert("没人参加呢！");
+          return;
+        }
+
+        const winnerIndex = Math.floor(Math.random() * names.length);
+        const winnerName = names[winnerIndex];
+
+        set(ref(db, `rooms/${roomId}/winner`), winnerName);
+      });
+    };
+
+    // 重置
+    window.reset = function() {
+      if (confirm("确定重置？所有数据清空！")) {
+        remove(ref(db, `rooms/${roomId}`));
+        location.reload();
+      }
+    };
+  </script>
+
+  <style>
+    body{font-family:system-ui,sans-serif;background:#111;color:#fff;text-align:center;padding:20px;}
+    h1{color:#ffeb3b;}
+    #participants{list-style:none;padding:0;}
+    #participants li{background:#333;margin:8px auto;padding:10px;border-radius:8px;max-width:300px;}
+    #status{font-size:1.4em;margin:20px;color:#4caf50;}
+    button{font-size:1.2em;padding:12px 24px;margin:10px;background:#2196f3;color:white;border:none;border-radius:8px;cursor:pointer;}
+    button:hover{background:#1976d2;}
+    #winner{font-size:3em;color:#ff5722;margin:40px 0;font-weight:bold;animation:pulse 1.5s infinite;}
+    @keyframes pulse{0%{transform:scale(1);}50%{transform:scale(1.1);}100%{transform:scale(1);}}
+    input{padding:10px;font-size:1.1em;margin:8px;width:220px;}
+  </style>
+</head>
+<body>
+
+<h1>联机抽奖系统</h1>
+
+<div>
+  <input id="roomId" placeholder="房间名（比如：2026年会）" value="default-room" />
+  <input id="myName" placeholder="你的名字" />
+  <button onclick="join()">加入抽奖</button>
+</div>
+
+<h3>参与者（实时）</h3>
+<ul id="participants"></ul>
+
+<div id="status">等待中...</div>
+
+<button id="startBtn" onclick="startDraw()" style="display:none;">开始抽奖！</button>
+<button onclick="reset()">重置抽奖</button>
+
+<div id="winner"></div>
+
+</body>
+</html>

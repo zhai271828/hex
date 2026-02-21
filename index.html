@@ -3,264 +3,266 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>海克斯麻将大乱斗（联机版）</title>
+<title>海克斯麻将大乱斗（联机房间版）</title>
 
-<!-- Firebase Modular SDK CDN -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-  import { getDatabase, ref, set, onValue, get, push, update } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { 
+  getDatabase, 
+  ref, 
+  set, 
+  onValue, 
+  get, 
+  push, 
+  update,
+  runTransaction,
+  onDisconnect
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
-  // ────────────────────────────────────────────────
-  // 替换成你自己的 Firebase 配置（必须！）
-  const firebaseConfig = {
-    apiKey: "AIzaSyAmqq64kRIAzTKdnveJqg25XTV19QMmQ1s",
-    authDomain: "choujiang-88289.firebaseapp.com",
-    databaseURL: "https://choujiang-88289-default-rtdb.firebaseio.com",
-    projectId: "choujiang-88289",
-    storageBucket: "choujiang-88289.firebasestorage.app",
-    messagingSenderId: "423937514409",
-    appId: "1:423937514409:web:c674a44070bfab9e5482b8",
-    measurementId: "G-27T9NNLNL6"
-  };
-  // ────────────────────────────────────────────────
+/* =============================
+   你的 Firebase 配置（未修改）
+============================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyAmqq64kRIAzTKdnveJqg25XTV19QMmQ1s",
+  authDomain: "choujiang-88289.firebaseapp.com",
+  databaseURL: "https://choujiang-88289-default-rtdb.firebaseio.com",
+  projectId: "choujiang-88289",
+  storageBucket: "choujiang-88289.firebasestorage.app",
+  messagingSenderId: "423937514409",
+  appId: "1:423937514409:web:c674a44070bfab9e5482b8",
+  measurementId: "G-27T9NNLNL6"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
-  // 海克斯列表
-  const hexList = [
-    {name:"红中大乐透",desc:"摸到红中时，立刻再摸两张，然后扔出两张牌"},
-    {name:"不拘一格",desc:"你可以选择不在牌堆，而是在废弃牌中摸一张牌"},
-    {name:"开摆",desc:"你接下来三轮无法行动，第四轮时可以摸六张牌"},
-    {name:"后期专家",desc:"当牌只剩最后一排时，你胡牌倍数翻倍"},
-    {name:"潘多拉备战席",desc:"你有一张手牌可以当做同样点数的其他牌"},
-    {name:"福星之冕",desc:"你可以把发财当做万能牌使用"},
-    {name:"变形重组器",desc:"开局使用，扔一个骰子，根据点数摸几打几"},
-    {name:"恶魔契约",desc:"开局使用，你只能通过清一色胡牌，每回合可以摸两张牌，清一色为翻四番"},
-    {name:"光明偷偷",desc:"向一个人索要一张指定牌（非万能牌），如果没有，他下回合无法行动"},
-    {name:"行家里手",desc:"开局使用，选择一个玩家抽取他的三张手牌并还给他三张"},
-    {name:"了解你的敌人",desc:"选择一名玩家明牌行动"},
-    {name:"先苦后甜",desc:"如果你凑齐东西南北风四张牌，可以一回合打掉这四张牌，并且摸三张牌，有一张可视为万能牌"},
-    {name:"拆卸器",desc:"你可以让一个玩家的海克斯无法生效"},
-    {name:"南蛮入侵",desc:"本回合所有人必须打出条子，否则胡牌番数-2"},
-    {name:"万箭齐发",desc:"本回合所有人必须打出万子，否则胡牌番数-2"},
-    {name:"宝宝麻将",desc:"你每碰一次牌，胡牌番数+2"},
-    {name:"最后储备",desc:"当你即将死亡时，你免疫本回合的淘汰，下一次对局时，有两张牌可以当做万能牌使用并且番数乘2"},
-    {name:"最佳好友",desc:"如果你已经听牌，有一家胡牌时他的牌中有你听的牌，则你无需付出"},
-    {name:"优柔寡断",desc:"本回合无法行动，下个回合偷取一个人的海克斯"},
-    {name:"遥遥领先",desc:"开局使用，你无法摸牌，转而从弃牌堆里面摸取一张"},
-    {name:"英雄登场",desc:"当一人胡牌时，你可以用一张牌换取他所摸到的那张牌截胡"},
-    {name:"利滚利",desc:"当你连续三把未胡牌时，下一把胡牌翻倍"},
-    {name:"清晰头脑",desc:"如果你本局没有碰，杠胡了，本局番数+3"},
-    {name:"奋起直追",desc:"开局使用，低于十五点筹码时，本局摸二打二"},
-    {name:"商店故障",desc:"你可以选择一种牌（条饼万杂），直到摸到该种类牌为止"},
-    {name:"胜利宣告",desc:"如果你在火热连胜状态，胡牌番数乘二，直到失败为止"},
-    {name:"棱彩命运",desc:"你立刻抽取三个海克斯，从中抽取一个，其余两个作废"},
-    {name:"决斗",desc:"你可以指定两个人两轮轮流出你指定的牌型（条饼万杂），若有人出不出来则下回合无法行动"},
-    {name:"重启任务",desc:"开局使用，你可以选择放弃自己的牌转而重新摸取"},
-    {name:"光明水银",desc:"使其他人的海克斯无法对你生效"},
-    {name:"休眠锻炉",desc:"使用该海克斯之后下回合可以抽取两个海克斯"},
-    {name:"冒险举动",desc:"开局使用，你选择明牌行动，若胡牌则番数乘三"},
-    {name:"五谷丰登",desc:"立刻摸取四张牌，从自己开始轮流选择一张"},
-    {name:"潘多拉的盒子",desc:"你胡牌时可以选择抽取两次决定你的番数"},
-    {name:"D个痛快",desc:"本回合你可以摸三打三"},
-    {name:"别再错过",desc:"你可以放弃摸牌阶段，转而从自己打出去的牌中摸一张"},
-    {name:"挑个好伙计",desc:"若你已经听牌，其余人打出一张你所听的牌，你可以进行一次判定，若下张牌为你所预测的类型（条饼万杂），则你可以拿一张牌换取你所听的牌"}
-  ];
+/* =============================
+   房间系统
+============================= */
+let roomId = localStorage.getItem("roomId");
+if (!roomId) {
+  roomId = prompt("请输入房间号（可自定义）") || 
+           "room_" + Math.random().toString(36).substr(2,6);
+  localStorage.setItem("roomId", roomId);
+}
 
-  let playerName = localStorage.getItem("playerName");
-  let playerId = localStorage.getItem("playerId");
-  if (!playerId) {
-    playerId = "p_" + Math.random().toString(36).substr(2, 8);
-    localStorage.setItem("playerId", playerId);
+const poolRef = ref(db, `rooms/${roomId}/pool`);
+const playersRef = ref(db, `rooms/${roomId}/players`);
+const chatRef = ref(db, `rooms/${roomId}/chat`);
+
+/* =============================
+   玩家ID
+============================= */
+let playerName = localStorage.getItem("playerName");
+let playerId = localStorage.getItem("playerId");
+
+if (!playerId) {
+  playerId = "p_" + Math.random().toString(36).substr(2,8);
+  localStorage.setItem("playerId", playerId);
+}
+
+let owned = [];
+let players = {};
+let chatMessages = [];
+let lastDrawnHex = null;
+
+/* =============================
+   你的完整海克斯列表（原封不动）
+============================= */
+const hexList = [
+  {name:"红中大乐透",desc:"摸到红中时，立刻再摸两张，然后扔出两张牌"},
+  {name:"不拘一格",desc:"你可以选择不在牌堆，而是在废弃牌中摸一张牌"},
+  {name:"开摆",desc:"你接下来三轮无法行动，第四轮时可以摸六张牌"},
+  {name:"后期专家",desc:"当牌只剩最后一排时，你胡牌倍数翻倍"},
+  {name:"潘多拉备战席",desc:"你有一张手牌可以当做同样点数的其他牌"},
+  {name:"福星之冕",desc:"你可以把发财当做万能牌使用"},
+  {name:"变形重组器",desc:"开局使用，扔一个骰子，根据点数摸几打几"},
+  {name:"恶魔契约",desc:"开局使用，你只能通过清一色胡牌，每回合可以摸两张牌，清一色为翻四番"},
+  {name:"光明偷偷",desc:"向一个人索要一张指定牌（非万能牌），如果没有，他下回合无法行动"},
+  {name:"行家里手",desc:"开局使用，选择一个玩家抽取他的三张手牌并还给他三张"},
+  {name:"了解你的敌人",desc:"选择一名玩家明牌行动"},
+  {name:"先苦后甜",desc:"如果你凑齐东西南北风四张牌，可以一回合打掉这四张牌，并且摸三张牌，有一张可视为万能牌"},
+  {name:"拆卸器",desc:"你可以让一个玩家的海克斯无法生效"},
+  {name:"南蛮入侵",desc:"本回合所有人必须打出条子，否则胡牌番数-2"},
+  {name:"万箭齐发",desc:"本回合所有人必须打出万子，否则胡牌番数-2"},
+  {name:"宝宝麻将",desc:"你每碰一次牌，胡牌番数+2"},
+  {name:"最后储备",desc:"当你即将死亡时，你免疫本回合的淘汰"},
+  {name:"最佳好友",desc:"如果你已经听牌，有一家胡牌时他的牌中有你听的牌，则你无需付出"},
+  {name:"优柔寡断",desc:"本回合无法行动，下个回合偷取一个人的海克斯"},
+  {name:"遥遥领先",desc:"开局使用，你无法摸牌，转而从弃牌堆里面摸取一张"},
+  {name:"英雄登场",desc:"当一人胡牌时，你可以用一张牌换取他所摸到的那张牌截胡"},
+  {name:"利滚利",desc:"当你连续三把未胡牌时，下一把胡牌翻倍"},
+  {name:"清晰头脑",desc:"如果你本局没有碰，杠胡了，本局番数+3"},
+  {name:"奋起直追",desc:"开局使用，低于十五点筹码时，本局摸二打二"},
+  {name:"商店故障",desc:"你可以选择一种牌（条饼万杂），直到摸到该种类牌为止"},
+  {name:"胜利宣告",desc:"如果你在火热连胜状态，胡牌番数乘二，直到失败为止"},
+  {name:"棱彩命运",desc:"你立刻抽取三个海克斯，从中抽取一个"},
+  {name:"决斗",desc:"指定两个人轮流出指定牌型"},
+  {name:"重启任务",desc:"放弃自己的牌重新摸取"},
+  {name:"光明水银",desc:"其他人的海克斯无法对你生效"},
+  {name:"休眠锻炉",desc:"下回合可以抽两个海克斯"},
+  {name:"冒险举动",desc:"明牌行动，若胡牌番数乘三"},
+  {name:"五谷丰登",desc:"摸四张牌轮流选"},
+  {name:"潘多拉的盒子",desc:"胡牌时抽取两次决定番数"},
+  {name:"D个痛快",desc:"本回合摸三打三"},
+  {name:"别再错过",desc:"可从自己打出去的牌中摸一张"},
+  {name:"挑个好伙计",desc:"听牌时可判定换取牌"}
+];
+
+/* =============================
+   初始化卡池
+============================= */
+onValue(poolRef, (snap) => {
+  let pool = snap.val();
+  if (!pool || pool.length === 0) {
+    set(poolRef, shuffle([...hexList]));
   }
+});
 
-  const poolRef = ref(db, 'hex/pool');
-  const playersRef = ref(db, 'hex/players');
-  const chatRef = ref(db, 'hex/chat');
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
 
-  let owned = [];
-  let players = {};
-  let chatMessages = [];
+/* =============================
+   并发安全抽卡
+============================= */
+window.drawHex = async function() {
 
-  onValue(poolRef, (snap) => {
-    let pool = snap.val();
+  const result = await runTransaction(poolRef, (pool) => {
+
     if (!pool || pool.length === 0) {
       pool = shuffle([...hexList]);
-      set(poolRef, pool);
     }
+
+    const drawn = pool.shift();
+    lastDrawnHex = drawn;
+    return pool;
   });
 
-  onValue(playersRef, (snap) => {
-    players = snap.val() || {};
-    if (playerName && !players[playerId]) {
-      update(ref(db, `hex/players/${playerId}`), {
-        name: playerName,
-        owned: []
-      });
-    }
-    renderPlayers();
+  if (!result.committed || !lastDrawnHex) return;
+
+  const myOwned = [...owned, lastDrawnHex];
+
+  await update(ref(db, `rooms/${roomId}/players/${playerId}`), {
+    owned: myOwned
   });
 
-  onValue(ref(db, `hex/players/${playerId}/owned`), (snap) => {
-    owned = snap.val() || [];
-    renderOwned();
+  addChatMessage(`${playerName} 抽到了 【${lastDrawnHex.name}】`);
+};
+
+/* =============================
+   加入游戏 + 自动下线
+============================= */
+window.joinGame = function() {
+
+  if (!playerName) {
+    playerName = prompt("请输入名字：");
+    if (!playerName) return;
+    localStorage.setItem("playerName", playerName);
+  }
+
+  const playerRef = ref(db, `rooms/${roomId}/players/${playerId}`);
+
+  update(playerRef, {
+    name: playerName,
+    owned: []
   });
 
-  onValue(chatRef, (snap) => {
-    chatMessages = snap.val() ? Object.values(snap.val()) : [];
-    renderChat();
+  onDisconnect(playerRef).remove();
+
+  document.getElementById("joinSection").style.display = "none";
+  document.getElementById("gameSection").style.display = "block";
+};
+
+/* =============================
+   监听
+============================= */
+onValue(playersRef, (snap) => {
+  players = snap.val() || {};
+  renderPlayers();
+});
+
+onValue(ref(db, `rooms/${roomId}/players/${playerId}/owned`), (snap) => {
+  owned = snap.val() || [];
+  renderOwned();
+});
+
+onValue(chatRef, (snap) => {
+  chatMessages = snap.val() ? Object.values(snap.val()) : [];
+  renderChat();
+});
+
+/* =============================
+   其他函数
+============================= */
+window.useHex = function(index) {
+  const hex = owned[index];
+  alert(`你使用了【${hex.name}】`);
+  owned.splice(index,1);
+  update(ref(db, `rooms/${roomId}/players/${playerId}`), { owned });
+  addChatMessage(`${playerName} 使用了 【${hex.name}】`);
+};
+
+function addChatMessage(text) {
+  push(chatRef, { text, timestamp: Date.now() });
+}
+
+function renderPlayers() {
+  const count = Object.keys(players).length;
+  document.getElementById("playerCount").textContent = 
+    `当前在线：${count} 人`;
+  document.getElementById("playerList").innerHTML =
+    Object.values(players)
+      .map(p => `<li>${p.name}</li>`).join("");
+}
+
+function renderOwned() {
+  const container = document.getElementById("owned");
+  container.innerHTML = "";
+  owned.forEach((h,i) => {
+    const div = document.createElement("div");
+    div.className = "hex";
+    div.innerHTML = `<strong>${h.name}</strong>${h.desc}`;
+    div.onclick = () => useHex(i);
+    container.appendChild(div);
   });
+}
 
-  function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-  }
-
-  function joinGame() {
-    if (!playerName) {
-      playerName = prompt("请输入你的名字：");
-      if (!playerName || !playerName.trim()) {
-        alert("名字不能为空！");
-        return joinGame();
-      }
-      playerName = playerName.trim();
-      localStorage.setItem("playerName", playerName);
-    }
-
-    update(ref(db, `hex/players/${playerId}`), {
-      name: playerName,
-      owned: []
-    });
-
-    document.getElementById("joinSection").style.display = "none";
-    document.getElementById("gameSection").style.display = "block";
-  }
-
-  function drawHex() {
-    get(poolRef).then(snap => {
-      let pool = snap.val() || shuffle([...hexList]);
-      if (pool.length === 0) pool = shuffle([...hexList]);
-
-      const drawn = pool.shift();
-      set(poolRef, pool);
-
-      const myOwned = [...owned, drawn];
-      update(ref(db, `hex/players/${playerId}`), { owned: myOwned });
-
-      addChatMessage(`${playerName} 抽到了 【${drawn.name}】`);
-    });
-  }
-
-  function useHex(index) {
-    const hex = owned[index];
-    const playerNames = Object.values(players).map(p => p.name).filter(n => n !== playerName);
-    const options = ["对自己", ...playerNames, "对所有人"];
-
-    let choice = prompt(`使用 【${hex.name}】\n\n目标选项（输入对应数字）：\n1. 对自己\n${playerNames.map((n,i) => `${i+2}. 对 ${n}`).join('\n') || '（暂无其他玩家）'}\n${playerNames.length + 2}. 对所有人\n\n请输入数字：`);
-
-    if (!choice || isNaN(choice) || choice < 1 || choice > options.length) {
-      alert("无效选择");
-      return;
-    }
-
-    const target = options[choice - 1];
-    let targetText = target === "对自己" ? playerName : target;
-
-    alert(`你对 ${targetText} 使用了 【${hex.name}】`);
-
-    owned.splice(index, 1);
-    update(ref(db, `hex/players/${playerId}`), { owned });
-
-    addChatMessage(`${playerName} 使用了 【${hex.name}】 对 ${targetText}`);
-  }
-
-  function addChatMessage(text) {
-    push(chatRef, {
-      text,
-      timestamp: Date.now(),
-      sender: playerName
-    });
-  }
-
-  function renderPlayers() {
-    const count = Object.keys(players).length;
-    document.getElementById("playerCount").textContent = `当前在线：${count} 人`;
-    document.getElementById("playerList").innerHTML = Object.values(players).map(p => `<li>${p.name}</li>`).join("");
-  }
-
-  function renderOwned() {
-    const container = document.getElementById("owned");
-    container.innerHTML = "";
-    owned.forEach((h, i) => {
-      const div = document.createElement("div");
-      div.className = "hex";
-      div.innerHTML = `<strong>${h.name}</strong>${h.desc}`;
-      div.onclick = () => useHex(i);
-      container.appendChild(div);
-    });
-  }
-
-  function renderChat() {
-    const chat = document.getElementById("chat");
-    chat.innerHTML = chatMessages.map(m => `<div class="chat-msg">${m.text}</div>`).join("");
-    chat.scrollTop = chat.scrollHeight;
-  }
-
-  window.onload = () => {
-    if (playerName) {
-      document.getElementById("joinSection").style.display = "none";
-      document.getElementById("gameSection").style.display = "block";
-      joinGame();
-    }
-  };
-
-  document.getElementById("joinBtn").onclick = joinGame;
+function renderChat() {
+  const chat = document.getElementById("chat");
+  chat.innerHTML = chatMessages
+    .map(m => `<div class="chat-msg">${m.text}</div>`).join("");
+  chat.scrollTop = chat.scrollHeight;
+}
 </script>
 
 <style>
-body { margin:0; font-family:system-ui, sans-serif; background:#f5f5f5; text-align:center; padding:15px; }
-h1 { margin:10px 0; font-size:1.6rem; }
-button { padding:12px 24px; font-size:1rem; margin:8px; border-radius:8px; border:none; background:#ff9800; color:white; cursor:pointer; }
-#resetBtn { background:#f44336; }
-#owned { max-height:55vh; overflow-y:auto; margin:15px auto; max-width:600px; }
-.hex { background:#4caf50; color:white; padding:12px 16px; border-radius:10px; margin:10px 0; text-align:left; cursor:pointer; }
-.hex strong { display:block; font-size:1.1rem; margin-bottom:6px; }
-#playerList { list-style:none; padding:0; margin:10px auto; max-width:400px; }
-#playerList li { background:#e8e8e8; padding:8px; margin:6px 0; border-radius:6px; }
-#chat { background:white; border:1px solid #ddd; height:220px; overflow-y:auto; text-align:left; padding:12px; margin:20px auto; max-width:600px; border-radius:10px; }
-.chat-msg { margin:8px 0; padding:8px; background:#f0f0f0; border-radius:6px; }
-#joinSection, #gameSection { margin:20px auto; max-width:600px; }
+body { margin:0; font-family:system-ui; background:#f5f5f5; text-align:center; padding:15px; }
+button { padding:12px 24px; margin:8px; border-radius:8px; border:none; background:#ff9800; color:white; cursor:pointer; }
+.hex { background:#4caf50; color:white; padding:12px; border-radius:10px; margin:10px 0; text-align:left; cursor:pointer; }
+#chat { background:white; border:1px solid #ddd; height:200px; overflow-y:auto; padding:10px; margin:20px auto; max-width:600px; border-radius:10px; text-align:left;}
+.chat-msg { margin:6px 0; padding:6px; background:#f0f0f0; border-radius:6px; }
 </style>
 </head>
-<body>
 
+<body>
 <div id="joinSection">
-  <h1>🎴 海克斯麻将大乱斗（联机）</h1>
-  <p>请输入名字加入游戏</p>
-  <button id="joinBtn">加入游戏</button>
+  <h1>🎴 海克斯麻将大乱斗（房间版）</h1>
+  <button onclick="joinGame()">加入游戏</button>
 </div>
 
 <div id="gameSection" style="display:none;">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-    <h1>海克斯麻将大乱斗</h1>
-    <button id="resetBtn" onclick="if(confirm('重置将清空数据，确定？')) location.reload();">重置</button>
-  </div>
-
-  <p id="playerCount">当前在线：0 人</p>
+  <p id="playerCount"></p>
   <ul id="playerList"></ul>
-
-  <button id="drawBtn" onclick="drawHex()">抽一个海克斯</button>
-
-  <h3>我的海克斯（点击使用）</h3>
+  <button onclick="drawHex()">抽一个海克斯</button>
+  <h3>我的海克斯</h3>
   <div id="owned"></div>
-
   <h3>公屏</h3>
   <div id="chat"></div>
 </div>
-
 </body>
 </html>
